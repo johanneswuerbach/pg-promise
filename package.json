@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "manakin": "0.5.2",
-    "pg": "7.7.1",
+    "pg": "github:johanneswuerbach/node-postgres#fix-double-release",
     "pg-minify": "0.5.5",
     "spex": "2.1.0"
   },
