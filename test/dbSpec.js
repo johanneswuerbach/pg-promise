@@ -1485,6 +1485,47 @@ describe('Transactions', () => {
             delete options.query;
         });
     });
+
+    describe('db side closing of the connection during slow-verify', () => {
+        // dumb connection cloning;
+        const singleCN = JSON.parse(JSON.stringify(dbHeader.cn));
+        singleCN.max = 1;
+        // simulate a slow verify call;
+        singleCN.verify = (client, done) => {
+            client.query('SELECT pg_sleep(3);', done);
+        };
+        const dbSingleCN = pgp(singleCN);
+
+        let error;
+
+        beforeEach(done => {
+            Promise.all([
+                dbSingleCN.connect().then((obj) => {
+                    obj.done();
+                }, reason => {
+                    error = reason;
+                })
+                ,
+                // Terminate the connections during verify, which causes an 'error' event from the pool
+                promise.delay(500).then(() => {
+                    return db.query(
+                        'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid();'
+                    );
+                })
+            ]).then(() => {
+                done();
+            }, (err) => {
+                done(err);
+            });
+        });
+
+        it('returns the postgres error', () => {
+            expect(error instanceof Error).toBe(true);
+
+            expect(error.code).toEqual('57P01');
+            expect(error.message).toEqual('terminating connection due to administrator command');
+        });
+    });
 });
 
 describe('Conditional Transaction', () => {
